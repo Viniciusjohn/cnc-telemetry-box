@@ -43,13 +43,44 @@ export default function App() {
   }, []);
 
   return (
-    <main style={{background:"#0a0a0a", minHeight:"100vh", color:"#e5e7eb", padding:"24px", fontFamily:"ui-sans-serif"}}>
-      <header style={{marginBottom:24, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-        <h1 style={{fontSize:28, fontWeight:700}}>CNC Telemetry — Dashboard</h1>
-        <div style={{fontSize:14, opacity:0.7}}>
-          {status?.machine_id || "—"}
-        </div>
-      </header>
+    <main style={{
+      background:"linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%)", 
+      minHeight:"100vh", 
+      color:"#e5e7eb", 
+      padding:"40px 80px",
+      fontFamily:"ui-sans-serif"
+    }}>
+      {/* Container centralizado para 1920x1080 */}
+      <div style={{maxWidth:1760, margin:"0 auto"}}>
+        <header style={{
+          marginBottom:40, 
+          display:"flex", 
+          justifyContent:"space-between", 
+          alignItems:"center",
+          paddingBottom:24,
+          borderBottom:"2px solid rgba(255,255,255,0.1)"
+        }}>
+          <div>
+            <h1 style={{fontSize:36, fontWeight:700, marginBottom:8, letterSpacing:"-0.02em"}}>
+              CNC Telemetry Dashboard
+            </h1>
+            <p style={{fontSize:14, opacity:0.6, margin:0}}>
+              Monitoramento em tempo real • Atualização a cada 2s
+            </p>
+          </div>
+          <div style={{
+            background:"rgba(59, 130, 246, 0.1)",
+            border:"1px solid rgba(59, 130, 246, 0.3)",
+            padding:"12px 24px",
+            borderRadius:12,
+            textAlign:"right"
+          }}>
+            <div style={{fontSize:12, opacity:0.7, marginBottom:4}}>Máquina</div>
+            <div style={{fontSize:18, fontWeight:600, color:"#3b82f6"}}>
+              {status?.machine_id || "—"}
+            </div>
+          </div>
+        </header>
 
       {error && (
         <div style={{background:"rgba(220,38,38,0.2)", border:"1px solid #dc2626", borderRadius:8, padding:16, marginBottom:16}}>
@@ -63,7 +94,13 @@ export default function App() {
         </div>
       )}
 
-      <section style={{display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(200px, 1fr))", gap:16, maxWidth:1200}}>
+      {/* Status Cards Grid - Otimizado para 1920x1080 */}
+      <section style={{
+        display:"grid", 
+        gridTemplateColumns:"repeat(4, 1fr)", 
+        gap:24, 
+        marginBottom:32
+      }}>
         <Card 
           title="RPM" 
           value={status?.rpm.toFixed(1) ?? "—"} 
@@ -86,14 +123,25 @@ export default function App() {
         />
       </section>
 
-      {/* OEE Card */}
-      <section style={{marginTop:24, maxWidth:1200}}>
+      {/* OEE Card - Full Width */}
+      <section style={{marginBottom:32}}>
         <OEECard machineId={MACHINE_ID} />
       </section>
 
-      <footer style={{marginTop:24, fontSize:12, opacity:0.5, textAlign:"center"}}>
-        Polling: {POLL_INTERVAL_MS / 1000}s | API: {import.meta.env.VITE_API_BASE}
+      {/* Footer */}
+      <footer style={{
+        marginTop:40, 
+        paddingTop:24,
+        borderTop:"1px solid rgba(255,255,255,0.05)",
+        fontSize:12, 
+        opacity:0.5, 
+        textAlign:"center"
+      }}>
+        <div>Polling: {POLL_INTERVAL_MS / 1000}s | API: {import.meta.env.VITE_API_BASE || 'http://localhost:8001'}</div>
+        <div style={{marginTop:8}}>CNC Telemetry v1.0 • Dashboard otimizado para 1920×1080</div>
       </footer>
+
+      </div> {/* Fim do container centralizado */}
     </main>
   );
 }
@@ -107,15 +155,55 @@ interface CardProps {
 
 function Card({ title, value, suffix, color }: CardProps) {
   return (
-    <div style={{background:"#111827", padding:20, borderRadius:16, border:"1px solid #1f2937"}}>
-      <div style={{fontSize:12, opacity:0.6, marginBottom:8, textTransform:"uppercase", letterSpacing:"0.05em"}}>
+    <div style={{
+      background:"linear-gradient(135deg, #1f2937 0%, #111827 100%)", 
+      padding:"28px 24px", 
+      borderRadius:20, 
+      border:"1px solid #374151",
+      boxShadow:"0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)",
+      transition:"all 0.3s ease",
+      position:"relative" as const,
+      overflow:"hidden"
+    }}>
+      {/* Brilho sutil de fundo */}
+      <div style={{
+        position:"absolute",
+        top:0,
+        right:0,
+        width:"100px",
+        height:"100px",
+        background:"radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)",
+        pointerEvents:"none"
+      }} />
+      
+      <div style={{
+        fontSize:13, 
+        opacity:0.7, 
+        marginBottom:12, 
+        textTransform:"uppercase", 
+        letterSpacing:"0.08em",
+        fontWeight:600,
+        position:"relative" as const
+      }}>
         {title}
       </div>
-      <div style={{fontSize:32, fontWeight:700, color: color || "#e5e7eb"}}>
+      <div style={{
+        fontSize:42, 
+        fontWeight:700, 
+        color: color || "#e5e7eb",
+        lineHeight:1,
+        marginBottom:8,
+        position:"relative" as const
+      }}>
         {value}
       </div>
       {suffix && (
-        <div style={{fontSize:12, opacity:0.5, marginTop:4}}>
+        <div style={{
+          fontSize:13, 
+          opacity:0.6, 
+          marginTop:8,
+          position:"relative" as const
+        }}>
           {suffix}
         </div>
       )}
