@@ -1,0 +1,28 @@
+MISSÃO 5 — TESTE DE REDE / FIREWALL (CNC TELEMETRY)
+
+Certifique-se de que o Telemetry está rodando neste PC:
+- Use scripts\start_telemetry.bat ou serviço equivalente.
+- Verifique http://localhost:8001/healthz neste PC (tem que retornar HTTP 200).
+
+IP detectado automaticamente: 192.168.56.1
+Porta do Telemetry: 8001
+
+De outro computador na mesma rede (ou do host, se a VM estiver em modo bridge), teste:
+PowerShell:
+    Invoke-WebRequest -Uri "http://192.168.56.1:8001/healthz"
+
+Se LOCAL funciona e de OUTRO HOST não funciona:
+- Verifique se o firewall do Windows está liberando a porta 8001/TCP para a rede privada.
+  (Exemplo: New-NetFirewallRule -DisplayName "CNC Telemetry 8001" -Direction Inbound -Protocol TCP -LocalPort 8001 -Action Allow -Profile Private)
+- Confirme que o host remoto está na mesma faixa de IP.
+- Anote se o outro host recebeu HTTP 200 ou o erro exibido.
+
+---
+ATUALIZAÇÃO MISSÃO 7 (PowerShell admin)
+- IP do PC Telemetry: 192.168.56.1
+- Porta do Telemetry: 8001
+- Regra de firewall "CNC Telemetry 8001": criada com sucesso (perfil Private)
+- Backend local verificado: `Invoke-WebRequest http://localhost:8001/healthz` → StatusCode 200 (com `scripts\start_telemetry.bat` em execução)
+- Para outro host na mesma rede:
+    Invoke-WebRequest -Uri "http://192.168.56.1:8001/healthz"
+  Esperado: HTTP 200. Registrar manualmente o resultado após o teste em campo.
