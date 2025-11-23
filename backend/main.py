@@ -94,9 +94,9 @@ async def _m80_worker_loop() -> None:
 async def log_startup() -> None:
     logger.info("CNC Telemetry API starting", extra={"version": APP_VERSION})
     global _m80_worker_task
-    if _m80_worker_task is None:
+    mark_worker_enabled(ENABLE_M80_WORKER)
+    if ENABLE_M80_WORKER and _m80_worker_task is None:
         loop = asyncio.get_running_loop()
-        mark_worker_enabled(ENABLE_M80_WORKER)
         _m80_worker_task = loop.create_task(_m80_worker_loop())
         logger.info(
             "M80 telemetry worker scheduled",

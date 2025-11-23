@@ -39,9 +39,26 @@ def _cfg(name: str, default: str | bool) -> str | bool:
     return default
 
 
+def _cfg_bool(name: str, default: bool) -> bool:
+    """Parse boolean-like values from config file safely.
+
+    Accepts real booleans and common string forms ("true", "1", "y", "yes").
+    Anything else falls back to `default` semantics.
+    """
+    if name not in _CONFIG:
+        return default
+
+    raw = _CONFIG[name]
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, str):
+        return raw.strip().lower() in {"1", "true", "y", "yes"}
+    return bool(raw)
+
+
 USE_SIMULATION_DATA: bool = _get_env_bool(
     "USE_SIMULATION_DATA",
-    bool(_cfg("USE_SIMULATION_DATA", True)),
+    _cfg_bool("USE_SIMULATION_DATA", True),
 )
 
 MACHINE_ID: str = str(_cfg("MACHINE_ID", "M80-DEMO-01"))
@@ -50,7 +67,7 @@ API_URL: str = str(_cfg("API_URL", "http://127.0.0.1:8001"))
 
 ENABLE_M80_WORKER: bool = _get_env_bool(
     "ENABLE_M80_WORKER",
-    bool(_cfg("ENABLE_M80_WORKER", True)),
+    _cfg_bool("ENABLE_M80_WORKER", True),
 )
 TELEMETRY_POLL_INTERVAL_SEC: float = float(_cfg("TELEMETRY_POLL_INTERVAL_SEC", 1.0))
 
