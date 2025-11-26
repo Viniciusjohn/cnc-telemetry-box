@@ -6,12 +6,10 @@ usando **Docker** e **Docker Compose**.
 > Importante: nao execute estes comandos como root diretamente; use um usuario
 > com permissao de docker (ex.: grupo `docker`) ou `sudo` quando necessario.
 
-## Subir apenas db + backend (dev)
+## Roteiro rapido para VM (6 comandos)
 
-Cenario de desenvolvimento: subir somente o banco Postgres e o backend FastAPI
-em containers, validando a API localmente.
+Na VM Linux (ex.: Ubuntu Server), logado como usuario normal (ex.: `vinicius`):
 
-### 1. Preparar arquivo `.env`
 
 ```bash
 cp .env.example .env
