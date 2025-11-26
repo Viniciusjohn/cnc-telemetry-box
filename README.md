@@ -29,6 +29,52 @@ Este layout de Box Linux complementa o modo Windows já documentado em `docs/STA
 
 ---
 
+## Como clonar e subir o CNC Telemetry Box (Linux + Docker + Postgres)
+
+Mini-servidor de telemetria CNC para rodar como **appliance Linux headless**,
+usando **Docker + Docker Compose + PostgreSQL**.
+
+Documentação funcional do produto:
+- `docs/CNC_TELEMETRY_BOX_V1.md`
+
+### 1. Clonar o repositório
+
+```bash
+git clone https://github.com/Viniciusjohn/cnc-telemetry-box.git
+cd cnc-telemetry-box
+```
+
+### 2. Criar o arquivo `.env`
+
+```bash
+cp .env.example .env
+# editar a senha de banco em .env (POSTGRES_PASSWORD)
+```
+
+### 3. Subir o stack completo (db + backend + adapter + sync + frontend)
+
+```bash
+docker compose up -d --build
+docker compose ps
+curl http://localhost:8001/healthz
+```
+
+Se tudo estiver OK:
+
+- O backend responde em `http://localhost:8001/healthz` com JSON `status: ok`.
+- O adapter demo começa a enviar eventos para `/v1/telemetry/ingest`.
+- O worker de sync imprime heartbeats periódicos (stub).
+
+### 4. Acessar a UI do Box
+
+No próprio servidor (ou em outro PC na mesma rede):
+
+- Abrir no navegador: `http://<IP_DO_BOX>/`
+
+A UI do CNC Telemetry Box será servida pelo container `frontend` na porta 80.
+
+---
+
 ## 📊 Métricas Coletadas
 
 - **RPM** (rotação do spindle)
