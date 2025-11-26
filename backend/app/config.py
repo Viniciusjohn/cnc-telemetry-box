@@ -81,14 +81,37 @@ def _env(key: str, default: str | None = None) -> str | None:
 
 @dataclass(frozen=True)
 class Settings:
-    """Minimal settings object for pilot deployments."""
+    """Minimal settings object for pilot deployments.
 
+    Para o CNC Telemetry Box (Linux + Docker + Postgres), as variaveis
+    prioritarias sao API_HOST, API_PORT e DATABASE_URL. As chaves
+    TELEMETRY_API_HOST/PORT e TELEMETRY_DATABASE_URL continuam
+    funcionando para manter compatibilidade com instalacoes existentes.
+    """
+
+    # Ordem de precedencia para URL de banco:
+    # 1) TELEMETRY_DATABASE_URL
+    # 2) DATABASE_URL
+    # 3) sqlite local (modo legacy/demo)
     database_url: str = _env(
         "TELEMETRY_DATABASE_URL",
         _env("DATABASE_URL", "sqlite:///./telemetry_beta.db"),
     )
-    api_host: str = _env("TELEMETRY_API_HOST", "0.0.0.0") or "0.0.0.0"
-    api_port: int = int(_env("TELEMETRY_API_PORT", "8000") or 8000)
+
+    # Ordem de precedencia para host/porta da API:
+    # 1) API_HOST / API_PORT (modo Box/Docker padrao)
+    # 2) TELEMETRY_API_HOST / TELEMETRY_API_PORT (legacy)
+    # 3) defaults
+    api_host: str = (
+        _env("API_HOST")
+        or _env("TELEMETRY_API_HOST", "0.0.0.0")
+        or "0.0.0.0"
+    )
+    api_port: int = int(
+        _env("API_PORT")
+        or _env("TELEMETRY_API_PORT", "8000")
+        or 8000
+    )
 
 
 settings = Settings()

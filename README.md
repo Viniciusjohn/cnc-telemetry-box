@@ -12,6 +12,23 @@ Serviço de telemetria CNC do projeto CNC-Genius (MTConnect → JSON canônico �
 
 ---
 
+## Sobre este repositório  — CNC Telemetry Box (Linux + Docker + Postgres)
+
+Este repositório empacota o servidor de telemetria CNC existente em um formato próprio para um **appliance Linux headless**, chamado **CNC Telemetry Box**:
+
+- Execução em um mini-PC ou servidor Linux dedicado na rede da fábrica.
+- Todos os componentes (db, backend, adapter(s), sync, frontend) rodando em **containers Docker**.
+- Banco padrão **PostgreSQL** para armazenamento local de histórico.
+- Dashboard web local acessível via HTTP a partir da LAN da fábrica.
+
+Para uma descrição funcional do produto e dos limites de capacidade do Box v1, consulte:
+
+- `docs/CNC_TELEMETRY_BOX_V1.md` — visão geral do **CNC Telemetry Box v1 — gateway local de telemetria CNC**.
+
+Este layout de Box Linux complementa o modo Windows já documentado em `docs/STATUS_WINDOWS_DEV.md` e `docs/DEPLOY_BETA_WINDOWS.md`, permitindo evoluir o mesmo backend para produção em fábrica.
+
+---
+
 ## 📊 Métricas Coletadas
 
 - **RPM** (rotação do spindle)

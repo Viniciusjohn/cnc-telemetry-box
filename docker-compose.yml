@@ -1,0 +1,60 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:-cncbox}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-troque-esta-senha}"
+      POSTGRES_DB: "${POSTGRES_DB:-cnc_telemetry}"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    ports:
+      # Em ambiente de desenvolvimento, expor a porta 5432 no host
+      - "5432:5432"
+
+  backend:
+    build: ./backend
+    depends_on:
+      - db
+    restart: unless-stopped
+    environment:
+      # URL completa do banco para o SQLAlchemy
+      DATABASE_URL: "${DATABASE_URL}"
+      # Host/porta onde o FastAPI escuta dentro do container
+      API_HOST: "${API_HOST:-0.0.0.0}"
+      API_PORT: "${API_PORT:-8001}"
+    ports:
+      # Expor a API no host em 8001
+      - "8001:8001"
+
+  adapter:
+    build: ./adapter
+    depends_on:
+      - backend
+    restart: unless-stopped
+    environment:
+      TELEMETRY_BASE_URL: "http://backend:8001"
+      TELEMETRY_MACHINE_ID: "${DEMO_MACHINE_ID:-M80-DEMO-01}"
+
+  sync:
+    build: ./sync
+    depends_on:
+      - backend
+    restart: unless-stopped
+    environment:
+      TELEMETRY_CENTRAL_URL: "${TELEMETRY_CENTRAL_URL}"
+      SYNC_INTERVAL_SECONDS: "${SYNC_INTERVAL_SECONDS:-60}"
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+
+# volumes:
+#   postgres_data:
+#     driver: local

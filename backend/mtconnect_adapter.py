@@ -23,6 +23,39 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+NS_ANY = "{*}"
+
+
+def _findall_anyns(root: ET.Element, tag: str) -> list[ET.Element]:
+    """Find all elements by local name, ignoring XML namespace.
+
+    Relies on ElementTree's wildcard namespace support (Python 3.8+).
+    """
+    return root.findall(f".//{NS_ANY}{tag}")
+
+
+def _find_anyns(root: ET.Element, tag: str) -> Optional[ET.Element]:
+    """Find first element by local name, ignoring XML namespace."""
+    return root.find(f".//{NS_ANY}{tag}")
+
+
+def _find_by_data_item_id(
+    root: ET.Element,
+    tag: str,
+    data_item_id: Optional[str],
+) -> Optional[ET.Element]:
+    """Find element by tag and dataItemId, ignoring namespace.
+
+    Falls back to the first element with the given tag if specific ID
+    cannot be found. This keeps behaviour robust across different
+    MTConnect Agents while still preferring the canonical mapping.
+    """
+    if data_item_id:
+        el = root.find(f".//{NS_ANY}{tag}[@dataItemId='{data_item_id}']")
+        if el is not None:
+            return el
+    return _find_anyns(root, tag)
+
 # Normalização de estados MTConnect → API
 EXECUTION_MAP = {
     # Estados canônicos MTConnect
@@ -61,6 +94,11 @@ class MTConnectAdapter:
         self.next_sequence: Optional[int] = None
         self.samples_sent = 0
         self.errors = 0
+
+        # DataItem IDs descobertos via /probe (namespace-aware)
+        self._rpm_id: Optional[str] = None
+        self._feed_id: Optional[str] = None
+        self._exec_id: Optional[str] = None
     
     async def discover(self) -> Dict[str, Any]:
         """Probe do agente MTConnect para descobrir DataItems"""
@@ -69,29 +107,44 @@ class MTConnectAdapter:
             response.raise_for_status()
             
             root = ET.fromstring(response.text)
-            data_items = root.findall(".//DataItem")
-            
-            discovered = {
+            data_items = _findall_anyns(root, "DataItem")
+
+            discovered: Dict[str, Optional[str]] = {
                 "rpm": None,
                 "feed": None,
-                "execution": None
+                "execution": None,
             }
-            
+
+            rpm_id: Optional[str] = None
+            feed_id: Optional[str] = None
+            exec_id: Optional[str] = None
+
             for item in data_items:
-                item_type = item.get("type", "")
-                item_id = item.get("id", "")
-                
+                item_type = (item.get("type") or "").upper()
+                item_id = item.get("id") or item.get("dataItemId")
+                if not item_id:
+                    continue
+
                 if item_type == "ROTARY_VELOCITY":
-                    discovered["rpm"] = item_id
+                    rpm_id = item_id
                 elif item_type == "SPINDLE_SPEED":  # Fallback legacy
-                    if not discovered["rpm"]:
-                        discovered["rpm"] = item_id
+                    if rpm_id is None:
+                        rpm_id = item_id
                         logger.warning(f"Usando SpindleSpeed (deprecated) - ID: {item_id}")
                 elif item_type == "PATH_FEEDRATE":
-                    discovered["feed"] = item_id
+                    feed_id = item_id
                 elif item_type == "EXECUTION":
-                    discovered["execution"] = item_id
-            
+                    exec_id = item_id
+
+            discovered["rpm"] = rpm_id
+            discovered["feed"] = feed_id
+            discovered["execution"] = exec_id
+
+            # Persistir IDs para uso nas próximas leituras de /sample
+            self._rpm_id = rpm_id
+            self._feed_id = feed_id
+            self._exec_id = exec_id
+
             logger.info(f"Descoberta: {discovered}")
             return discovered
             
@@ -127,21 +180,21 @@ class MTConnectAdapter:
     def parse_telemetry(self, root: ET.Element) -> Optional[Dict[str, Any]]:
         """Extrai e normaliza telemetria do XML"""
         try:
-            # Priorizar RotaryVelocity sobre SpindleSpeed
-            rpm_elem = root.find(".//RotaryVelocity")
+            # Priorizar RotaryVelocity sobre SpindleSpeed (namespace-aware)
+            rpm_elem = _find_by_data_item_id(root, "RotaryVelocity", self._rpm_id)
             if rpm_elem is None:
-                rpm_elem = root.find(".//SpindleSpeed")
+                rpm_elem = _find_by_data_item_id(root, "SpindleSpeed", self._rpm_id)
                 if rpm_elem is not None:
                     logger.warning("Usando SpindleSpeed (deprecated)")
-            
+
             rpm = float(rpm_elem.text) if rpm_elem is not None else 0.0
-            
+
             # PathFeedrate
-            feed_elem = root.find(".//PathFeedrate")
+            feed_elem = _find_by_data_item_id(root, "PathFeedrate", self._feed_id)
             if feed_elem is not None:
                 feed_value = float(feed_elem.text)
                 units = feed_elem.get("units", "")
-                
+
                 # Converter mm/s → mm/min se necessário
                 if "SECOND" in units:
                     feed_mm_min = feed_value * 60
@@ -149,9 +202,9 @@ class MTConnectAdapter:
                     feed_mm_min = feed_value
             else:
                 feed_mm_min = 0.0
-            
+
             # Execution
-            exec_elem = root.find(".//Execution")
+            exec_elem = _find_by_data_item_id(root, "Execution", self._exec_id)
             exec_value = exec_elem.text if exec_elem is not None else "READY"
             
             # Normalizar estado
@@ -163,11 +216,15 @@ class MTConnectAdapter:
             # Timestamp do XML ou UTC atual
             timestamp_elem = rpm_elem if rpm_elem is not None else exec_elem
             timestamp_str = timestamp_elem.get("timestamp") if timestamp_elem is not None else None
-            
+
+            # Fallback deve ser um ISO8601 que o backend consiga parsear diretamente
+            # sem gerar sufixos "+00:00+00:00" após o replace('Z', '+00:00').
             if timestamp_str:
                 timestamp = timestamp_str
             else:
-                timestamp = datetime.now(timezone.utc).isoformat(timespec='seconds') + 'Z'
+                # Usa datetime com timezone UTC, mas sem acrescentar "Z" manualmente;
+                # o backend já trata timestamps com offset "+00:00" nativo do isoformat.
+                timestamp = datetime.now(timezone.utc).isoformat(timespec='seconds')
             
             # Validar faixas
             if rpm > 30000:
