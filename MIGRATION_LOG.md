@@ -116,3 +116,42 @@
 **Checklist**: ✅ 5/5 itens executados
 
 **Conclusão**: Workflow Windows→Box OFICIALMENTE VALIDADO para produção real - transição completa de experimentos para necessidades do piloto
+
+---
+
+## 2025-11-27 - Primeira Melhoria UI (Piloto Nestor)
+
+**Windows ref**: N/A (implementação direta no Box)  
+**Descrição**: Adicionar MachineStateCard ao dashboard para visualizar estados das máquinas  
+**Contexto**: Primeira feature UI específica do piloto (sem equivalente Windows)
+
+**Arquivos alterados**:
+- `frontend/src/components/MachineStateCard.tsx` (novo, 118 linhas)
+  - Componente React consome /box/healthz.machine_count_by_state
+  - Estados com cores: running=verde, idle=amarelo, offline=vermelho
+  - Polling a cada 30s (alinhado com BoxHealth)
+- `frontend/src/components/MachineStateCard.css` (novo, 89 linhas)
+  - Design responsivo com progress bars e hover effects
+- `frontend/src/App.tsx` (+4 linhas)
+  - Import do MachineStateCard
+  - Integrado no topo da aba Dashboard (visão principal)
+
+**Testes executados**:
+- ⚠️ Backend não disponível localmente (Docker offline)
+- ✅ Componente compilou sem erros TypeScript
+- ✅ Estrutura segue padrão BoxHealth (polling, error handling)
+- TODO: Validar renderização com backend rodando
+
+**Resultado**: SUCCESS (pendente validação final)  
+**Tempo total**: 25 minutos (implementação + integração)  
+**Abordagem**: Implementação direta no Box (feature específica do piloto)
+
+**Fricções**: 
+- Docker Desktop não disponível para teste completo
+- Decisão de quebrar workflow Windows→Box para feature específica
+
+**Commits**: ✅ 1 commit (feat: MachineStateCard)  
+**Rollback**: ✅ Funcionará via git checkout HEAD~1  
+**Workflow**: ⚠️ Exceção justificada (sem equivalente Windows)
+
+**Conclusão**: Features específicas do piloto podem ser implementadas diretamente no Box quando não há equivalente Windows, mantendo rastreabilidade e rollback. Workflow Windows→Box permanece válido para migrações de código existente.
