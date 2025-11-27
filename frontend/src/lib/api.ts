@@ -69,19 +69,35 @@ export async function fetchMachineStatus(machineId: string = MACHINE_ID): Promis
  * Busca eventos históricos de uma máquina.
  * @throws {ApiError} Se response não for ok
  */
-export async function fetchMachineEvents(machineId: string = MACHINE_ID, limit: number = 50): Promise<MachineEvent[]> {
+export async function fetchMachineEvents(machineId: string = MACHINE_ID, limit: number = 20): Promise<MachineEvent[]> {
   const url = `${API_BASE}/v1/machines/${machineId}/events?limit=${limit}`;
-  
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Accept": "application/json",
-    },
-  });
-  
+  const response = await fetch(url);
+
   if (!response.ok) {
-    throw new ApiError(response.status, `Failed to fetch events: ${response.statusText}`);
+    throw new ApiError(response.status, `Failed to fetch machine events: ${response.statusText}`);
   }
-  
+
+  return response.json();
+}
+
+export async function fetchMachines(): Promise<string[]> {
+  const url = `${API_BASE}/v1/machines`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new ApiError(response.status, `Failed to fetch machines list: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function fetchMachinesStatusGrid(): Promise<MachineGridItem[]> {
+  const url = `${API_BASE}/v1/machines/status?view=grid`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new ApiError(response.status, `Failed to fetch machines status grid: ${response.statusText}`);
+  }
+
   return response.json();
 }

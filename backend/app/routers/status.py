@@ -1,22 +1,25 @@
 """
-Router para status de máquinas.
-Retorna último estado válido agregado pelo /ingest.
+Router para status de máquinas CNC.
+Endpoints para consultar e atualizar status individual e geral.
 """
 
+import time
 import logging
-
-from fastapi import APIRouter, Response, Depends, Query
-from pydantic import BaseModel, Field
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Dict, List
+from fastapi import APIRouter, HTTPException, Response, Query
+from pydantic import Field
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
-from ..db import get_db, TelemetryEvents
+from ..db import Telemetry, get_db
+from ..thread_safe_status import status_manager
+from ..logging_config import get_logger
 
-router = APIRouter(prefix="/v1/machines", tags=["status"])
-logger = logging.getLogger(__name__)
+logger = get_logger("status_router")
+
+router = APIRouter(prefix="/v1/machines", tags=["machines"])
 
 class MachineStatus(BaseModel):
     """Schema de status de máquina v0.1 (contrato canônico CNC-Genius)"""
@@ -79,6 +82,27 @@ class MachineEvent(BaseModel):
                 "alarm_code": None,
                 "alarm_message": None,
                 "part_count": 145
+            }
+        }
+
+class MachineGridItem(BaseModel):
+    """Schema para item de grid de máquinas (resumido)"""
+    machine_id: str = Field(..., description="Machine identifier")
+    execution: str = Field(..., description="Execution state (EXECUTING, STOPPED, READY)")
+    mode: str = Field(..., description="Operating mode (AUTOMATIC, MANUAL, etc.)")
+    rpm: float = Field(..., description="Spindle RPM")
+    timestamp_utc: str = Field(..., description="ISO 8601 UTC timestamp")
+    source: str = Field(default="mtconnect:sim", description="Data source identifier")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "machine_id": "SIM_M80_01",
+                "execution": "EXECUTING",
+                "mode": "AUTOMATIC",
+                "rpm": 3500,
+                "timestamp_utc": "2025-11-13T10:00:00Z",
+                "source": "mtconnect:sim"
             }
         }
 
@@ -184,6 +208,65 @@ def get_machine_events(
         )
 
     return result
+
+@router.get("", response_model=List[str])
+def list_machines(response: Response):
+    """
+    Retorna lista de IDs de máquinas conhecidas.
+    
+    Machines que já enviaram telemetria pelo menos uma vez.
+    """
+    # Headers canônicos
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Vary"] = "Origin, Accept-Encoding"
+    response.headers["X-Contract-Fingerprint"] = "010191590cf1"
+    response.headers["Server-Timing"] = "app;dur=1"
+    
+    # Retornar lista de machine_ids do LAST_STATUS
+    machine_ids = list(LAST_STATUS.keys())
+    machine_ids.sort()  # Ordenar para consistência
+    
+    return machine_ids
+
+@router.get("/status", response_model=List[MachineGridItem])
+def get_machines_status_grid(
+    view: str = Query("grid", pattern="^(grid)$", description="View format (only grid supported)"),
+    response: Response = None
+):
+    """
+    Retorna status resumido de todas as máquinas para visualização em grid.
+    
+    Parâmetro view é obrigatório e deve ser 'grid' para futuro extensibilidade.
+    Atualiza ~2s para UI em tempo real.
+    """
+    # Headers canônicos
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Vary"] = "Origin, Accept-Encoding"
+    response.headers["X-Contract-Fingerprint"] = "010191590cf1"
+    response.headers["Server-Timing"] = "app;dur=1"
+    
+    # Apenas view=grid é suportado
+    if view != "grid":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Only view=grid is supported")
+    
+    # Converter LAST_STATUS para MachineGridItem
+    grid_items: List[MachineGridItem] = []
+    for machine_id, status in LAST_STATUS.items():
+        grid_item = MachineGridItem(
+            machine_id=status.machine_id,
+            execution=status.execution,
+            mode=status.mode,
+            rpm=status.rpm,
+            timestamp_utc=status.timestamp_utc,
+            source=status.source
+        )
+        grid_items.append(grid_item)
+    
+    # Ordenar por machine_id para consistência
+    grid_items.sort(key=lambda x: x.machine_id)
+    
+    return grid_items
 
 def update_status(
     machine_id: str,

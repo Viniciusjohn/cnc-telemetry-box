@@ -5,17 +5,22 @@ Use `app.config.settings` for host/port/database overrides.
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 
-from fastapi import Depends, FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Literal
-from datetime import datetime, timezone
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+
+# Import logging configuration
+from backend.app.logging_config import get_logger, log_function_call
+from backend.app.rate_limit import limiter, rate_limit_telemetry, machine_limiter
 
 # Import routers
 from backend.app.config import ENABLE_M80_WORKER, TELEMETRY_POLL_INTERVAL_SEC
-from backend.app.routers import history, oee, status
+from backend.app.routers import history, oee, status, box_health
 
 # Import DB
 from backend.app.db import Telemetry, get_db
@@ -28,12 +33,7 @@ from backend.app.services.worker_monitor import (
 )
 
 APP_VERSION = "v0.3"
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s %(message)s",
-)
-logger = logging.getLogger("cnc-telemetry")
+logger = get_logger("main", version=APP_VERSION)
 
 app = FastAPI(title="CNC Telemetry API", version=APP_VERSION)
 _m80_worker_task: asyncio.Task | None = None
@@ -42,6 +42,7 @@ _m80_worker_task: asyncio.Task | None = None
 app.include_router(status.router)
 app.include_router(history.router)
 app.include_router(oee.router)
+app.include_router(box_health.router)
 
 # CORS
 origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
@@ -149,11 +150,23 @@ class TelemetryPayload(BaseModel):
     state: Literal["running", "stopped", "idle"]
 
 @app.post("/v1/telemetry/ingest", status_code=201)
-async def ingest_telemetry(payload: TelemetryPayload, db: Session = Depends(get_db)):
+@limiter.limit("100/minute")
+@log_function_call
+async def ingest_telemetry(request: Request, payload: TelemetryPayload, db: Session = Depends(get_db)):
     """Ingerir dados de telemetria (idempotência: machine_id+timestamp)"""
     
+    # Rate limiting por máquina
+    rate_limit_telemetry(request, payload.machine_id)
+    
+    # Logger com contexto da máquina
+    ingest_logger = get_logger("telemetry_ingest", machine_id=payload.machine_id)
+    
     # Parse timestamp
-    ts = datetime.fromisoformat(payload.timestamp.replace('Z', '+00:00'))
+    try:
+        ts = datetime.fromisoformat(payload.timestamp.replace('Z', '+00:00'))
+    except ValueError as e:
+        ingest_logger.error("invalid_timestamp", timestamp=payload.timestamp, error=str(e))
+        raise HTTPException(status_code=400, detail="Invalid timestamp format")
     
     # Persistir em TimescaleDB
     try:
@@ -167,19 +180,36 @@ async def ingest_telemetry(payload: TelemetryPayload, db: Session = Depends(get_
         )
         db.add(db_record)
         db.commit()
-    except Exception as e:
-        # Se já existe (duplicate key), apenas atualizar status
+        
+        ingest_logger.info(
+            "telemetry_persisted",
+            rpm=payload.rpm,
+            feed_mm_min=payload.feed_mm_min,
+            state=payload.state,
+            timestamp=ts.isoformat()
+        )
+        
+    except IntegrityError as e:
         db.rollback()
-        print(f"DB insert failed (possibly duplicate): {e}")
+        ingest_logger.warning("duplicate_telemetry", machine_id=payload.machine_id, timestamp=ts.isoformat())
+        # Continuar - duplicate é aceitável para idempotência
+    except Exception as e:
+        db.rollback()
+        ingest_logger.error("database_error", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="Database operation failed")
     
     # Atualizar status em memória (para /status endpoint) + persistir evento v0.2
-    status.update_status(
-        machine_id=payload.machine_id,
-        rpm=payload.rpm,
-        feed_mm_min=payload.feed_mm_min,
-        state=payload.state,
-        db=db  # [v0.2] Passar sessão DB para persistir histórico
-    )
+    try:
+        status.update_status(
+            machine_id=payload.machine_id,
+            rpm=payload.rpm,
+            feed_mm_min=payload.feed_mm_min,
+            state=payload.state,
+            db=db  # [v0.2] Passar sessão DB para persistir histórico
+        )
+    except Exception as e:
+        ingest_logger.error("status_update_failed", error=str(e), exc_info=True)
+        # Não falhar a ingestão por falha no status update
     
     return {
         "ingested": True,

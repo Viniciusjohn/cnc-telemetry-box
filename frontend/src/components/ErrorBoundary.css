@@ -1,0 +1,229 @@
+.error-boundary {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 50vh;
+  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.error-container {
+  max-width: 600px;
+  background: white;
+  border-radius: 12px;
+  padding: 40px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e1e5e9;
+  text-align: center;
+}
+
+.error-icon {
+  font-size: 48px;
+  margin-bottom: 20px;
+}
+
+.error-boundary h2 {
+  color: #dc3545;
+  margin: 0 0 20px 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.error-details {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+  text-align: left;
+  border: 1px solid #e9ecef;
+}
+
+.error-details p {
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+.error-details strong {
+  color: #495057;
+}
+
+.error-stack {
+  margin-top: 15px;
+}
+
+.error-stack summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #007bff;
+  padding: 8px;
+  background: #e7f3ff;
+  border-radius: 4px;
+  outline: none;
+}
+
+.error-stack summary:hover {
+  background: #d1ecf1;
+}
+
+.error-stack pre {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  padding: 12px;
+  margin-top: 10px;
+  font-size: 12px;
+  overflow-x: auto;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.error-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin: 30px 0;
+}
+
+.retry-button, .reload-button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 140px;
+}
+
+.retry-button {
+  background: #007bff;
+  color: white;
+}
+
+.retry-button:hover {
+  background: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+}
+
+.reload-button {
+  background: #6c757d;
+  color: white;
+}
+
+.reload-button:hover {
+  background: #545b62;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
+}
+
+.error-help {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e9ecef;
+}
+
+.error-help p {
+  color: #6c757d;
+  font-size: 14px;
+  margin: 0;
+}
+
+/* Variantes específicas */
+.network-error .error-container {
+  border-left: 4px solid #fd7e14;
+}
+
+.network-error h2 {
+  color: #fd7e14;
+}
+
+.network-error .error-icon {
+  color: #fd7e14;
+}
+
+.data-error .error-container {
+  border-left: 4px solid #20c997;
+}
+
+.data-error h2 {
+  color: #20c997;
+}
+
+.data-error .error-icon {
+  color: #20c997;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .error-container {
+    padding: 30px 20px;
+    margin: 10px;
+  }
+  
+  .error-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .retry-button, .reload-button {
+    width: 100%;
+    max-width: 200px;
+  }
+  
+  .error-icon {
+    font-size: 36px;
+  }
+  
+  .error-boundary h2 {
+    font-size: 20px;
+  }
+}
+
+/* Animações */
+@keyframes errorShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+.error-boundary {
+  animation: errorShake 0.5s ease-in-out;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .error-container {
+    background: #2d3748;
+    border-color: #4a5568;
+    color: #e2e8f0;
+  }
+  
+  .error-details {
+    background: #1a202c;
+    border-color: #4a5568;
+  }
+  
+  .error-details strong {
+    color: #e2e8f0;
+  }
+  
+  .error-stack summary {
+    background: #2b6cb0;
+    color: #bee3f8;
+  }
+  
+  .error-stack pre {
+    background: #1a202c;
+    border-color: #4a5568;
+    color: #e2e8f0;
+  }
+  
+  .error-help p {
+    color: #a0aec0;
+  }
+  
+  .error-help {
+    border-color: #4a5568;
+  }
+}

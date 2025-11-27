@@ -1,71 +1,46 @@
 import { useEffect, useState } from "react";
-import { fetchMachineStatus, fetchMachineEvents, MachineStatus, MachineEvent, ApiError } from "./lib/api";
+import { fetchMachineEvents, MachineEvent, ApiError } from "./lib/api";
 import { OEECard } from "./components/OEECard";
-import { MACHINE_ID } from "./config/machine";
+import { MachineSelector } from "./components/MachineSelector";
+import { BoxHealth } from "./components/BoxHealth";
+import { ErrorBoundary, NetworkErrorFallback, DataErrorFallback } from "./components/ErrorBoundary";
+import { useMachines } from "./contexts/MachinesContext";
+import { MachinesProvider } from "./contexts/MachinesContext";
 
-const POLL_INTERVAL_MS = 1000;
 const EVENTS_POLL_INTERVAL_MS = 10000; // 10s para eventos
 
-export default function App() {
-  const [status, setStatus] = useState<MachineStatus | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [connectionStatus, setConnectionStatus] = useState<"connected" | "unstable" | "disconnected">("disconnected");
+function AppContent() {
+  const { 
+    selectedMachineId, 
+    selectedMachineStatus, 
+    selectedMachineLoading, 
+    selectedMachineError,
+    machinesError 
+  } = useMachines();
+  
   const [events, setEvents] = useState<MachineEvent[]>([]);
   const [eventsError, setEventsError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'health'>('dashboard');
 
+  // Error boundary handler
+  const handleError = (error: Error, errorInfo: any) => {
+    console.error('App error:', error, errorInfo);
+    // Opcional: enviar para serviço de monitoring
+  };
+
+  // Poll events for selected machine
   useEffect(() => {
-    let isMounted = true;
-
-    async function poll() {
-      try {
-        const data = await fetchMachineStatus();
-        if (isMounted) {
-          setStatus(data);
-          setError(null);
-          setIsLoading(false);
-          
-          // Check connection status based on timestamp
-          const now = new Date();
-          const dataTime = new Date(data.timestamp_utc);
-          const timeDiff = now.getTime() - dataTime.getTime();
-          const maxDelay = 3 * data.update_interval_ms; // 3 seconds for 1s polling
-          
-          if (timeDiff > maxDelay) {
-            setConnectionStatus("unstable");
-          } else {
-            setConnectionStatus("connected");
-          }
-        }
-      } catch (e) {
-        if (isMounted) {
-          if (e instanceof ApiError) {
-            setError(`HTTP ${e.status}: ${e.message}`);
-          } else {
-            setError(e instanceof Error ? e.message : "Unknown error");
-          }
-          setIsLoading(false);
-          setConnectionStatus("disconnected");
-        }
-      }
+    if (!selectedMachineId) {
+      setEvents([]);
+      setEventsError(null);
+      return;
     }
 
-    poll();
-    const intervalId = setInterval(poll, POLL_INTERVAL_MS);
-
-    return () => {
-      isMounted = false;
-      clearInterval(intervalId);
-    };
-  }, []);
-
-  // [v0.2] useEffect para buscar eventos históricos
-  useEffect(() => {
     let isMounted = true;
 
     async function fetchEvents() {
       try {
-        const eventsData = await fetchMachineEvents(MACHINE_ID, 20);
+        const eventsData = await fetchMachineEvents(selectedMachineId, 20);
         if (isMounted) {
           setEvents(eventsData);
           setEventsError(null);
@@ -73,25 +48,44 @@ export default function App() {
       } catch (e) {
         if (isMounted) {
           if (e instanceof ApiError) {
-            setEventsError(`Erro ao buscar eventos: HTTP ${e.status}`);
+            setEventsError(`HTTP ${e.status}: ${e.message}`);
           } else {
-            setEventsError("Erro ao buscar eventos");
+            setEventsError(e instanceof Error ? e.message : "Unknown error");
           }
+          setEvents([]);
         }
       }
     }
 
-    // Buscar eventos imediatamente
+    // Initial fetch
     fetchEvents();
     
-    // Configurar polling de eventos (menos frequente)
-    const eventsIntervalId = setInterval(fetchEvents, EVENTS_POLL_INTERVAL_MS);
-
+    // Set up polling
+    const interval = setInterval(fetchEvents, EVENTS_POLL_INTERVAL_MS);
+    
     return () => {
       isMounted = false;
-      clearInterval(eventsIntervalId);
+      clearInterval(interval);
     };
-  }, []);
+  }, [selectedMachineId]);
+
+  // Determine connection status based on selected machine status
+  const getConnectionStatus = () => {
+    if (!selectedMachineStatus) return "disconnected";
+    
+    const now = new Date();
+    const dataTime = new Date(selectedMachineStatus.timestamp_utc);
+    const timeDiff = now.getTime() - dataTime.getTime();
+    const maxDelay = 3 * selectedMachineStatus.update_interval_ms;
+    
+    if (timeDiff > maxDelay) {
+      return "unstable";
+    } else {
+      return "connected";
+    }
+  };
+
+  const connectionStatus = getConnectionStatus();
 
   return (
     <main style={{
@@ -147,21 +141,79 @@ export default function App() {
             }}>
               <div style={{fontSize:12, opacity:0.7, marginBottom:4}}>Máquina</div>
               <div style={{fontSize:18, fontWeight:600, color:"#3b82f6"}}>
-                {status?.machine_id || "—"}
+                {selectedMachineStatus?.machine_id || "—"}
               </div>
             </div>
           </div>
         </header>
 
-      {error && (
+      {/* Machine Selector */}
+      <ErrorBoundary fallback={<NetworkErrorFallback />}>
+        <MachineSelector />
+      </ErrorBoundary>
+
+      {/* Navigation Tabs */}
+      <div style={{
+        display: "flex",
+        gap: "4px",
+        marginBottom: "20px",
+        borderBottom: "2px solid #e5e7eb"
+      }}>
+        <button
+          onClick={() => setActiveTab('dashboard')}
+          style={{
+            padding: "12px 24px",
+            border: "none",
+            background: activeTab === 'dashboard' ? "#3b82f6" : "transparent",
+            color: activeTab === 'dashboard' ? "white" : "#6b7280",
+            borderRadius: "8px 8px 0 0",
+            cursor: "pointer",
+            fontSize: "14px",
+            fontWeight: "500"
+          }}
+        >
+          📊 Dashboard
+        </button>
+        <button
+          onClick={() => setActiveTab('health')}
+          style={{
+            padding: "12px 24px",
+            border: "none",
+            background: activeTab === 'health' ? "#3b82f6" : "transparent",
+            color: activeTab === 'health' ? "white" : "#6b7280",
+            borderRadius: "8px 8px 0 0",
+            cursor: "pointer",
+            fontSize: "14px",
+            fontWeight: "500"
+          }}
+        >
+          🏥 Diagnóstico do Box
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'health' ? (
+        <ErrorBoundary fallback={<DataErrorFallback />}>
+          <BoxHealth />
+        </ErrorBoundary>
+      ) : (
+        <ErrorBoundary onError={handleError}>
+
+      {machinesError && (
         <div style={{background:"rgba(220,38,38,0.2)", border:"1px solid #dc2626", borderRadius:8, padding:16, marginBottom:16}}>
-          <strong>Erro:</strong> {error}
+          <strong>Erro:</strong> {machinesError}
         </div>
       )}
 
-      {isLoading && !status && (
+      {selectedMachineError && (
+        <div style={{background:"rgba(220,38,38,0.2)", border:"1px solid #dc2626", borderRadius:8, padding:16, marginBottom:16}}>
+          <strong>Erro na máquina:</strong> {selectedMachineError}
+        </div>
+      )}
+
+      {selectedMachineLoading && !selectedMachineStatus && (
         <div style={{textAlign:"center", padding:32, opacity:0.5}}>
-          Carregando...
+          Carregando status da máquina...
         </div>
       )}
 
@@ -174,21 +226,21 @@ export default function App() {
       }}>
         <Card 
           title="RPM" 
-          value={status?.rpm?.toFixed(1) ?? "—"} 
+          value={selectedMachineStatus?.rpm?.toFixed(1) ?? "—"} 
           suffix="rev/min"
-          color={getExecutionColor(status?.execution)}
+          color={getExecutionColor(selectedMachineStatus?.execution)}
           large={true}
         />
         <Card 
           title="FEED" 
-          value={status?.feed_rate?.toFixed(1) ?? "—"} 
+          value={selectedMachineStatus?.feed_rate?.toFixed(1) ?? "—"} 
           suffix="mm/min"
           large={true}
         />
         <Card 
           title="ESTADO" 
-          value={formatExecution(status?.execution)}
-          color={getExecutionColor(status?.execution)}
+          value={formatExecution(selectedMachineStatus?.execution)}
+          color={getExecutionColor(selectedMachineStatus?.execution)}
           large={true}
         />
       </section>
@@ -202,20 +254,20 @@ export default function App() {
       }}>
         <Card 
           title="MODO" 
-          value={formatMode(status?.mode)}
+          value={formatMode(selectedMachineStatus?.mode)}
         />
         <Card 
           title="LOAD (%)" 
-          value={status?.spindle_load_pct?.toFixed(0) ?? "—"}
-          suffix={status?.spindle_load_pct ? "%" : undefined}
+          value={selectedMachineStatus?.spindle_load_pct?.toFixed(0) ?? "—"}
+          suffix={selectedMachineStatus?.spindle_load_pct ? "%" : undefined}
         />
         <Card 
           title="FERRAMENTA" 
-          value={status?.tool_id ?? "—"}
+          value={selectedMachineStatus?.tool_id ?? "—"}
         />
         <AlarmCard 
-          alarmCode={status?.alarm_code}
-          alarmMessage={status?.alarm_message}
+          alarmCode={selectedMachineStatus?.alarm_code}
+          alarmMessage={selectedMachineStatus?.alarm_message}
         />
       </section>
 
@@ -319,8 +371,14 @@ export default function App() {
 
       {/* OEE Card - Full Width */}
       <section style={{marginBottom:32}}>
-        <OEECard machineId={MACHINE_ID} />
+        <ErrorBoundary fallback={<DataErrorFallback />}>
+          <OEECard machineId={selectedMachineId || ""} />
+        </ErrorBoundary>
       </section>
+
+        </>
+        )}
+      </ErrorBoundary>
 
       {/* Footer */}
       <footer style={{
@@ -331,7 +389,7 @@ export default function App() {
         opacity:0.5, 
         textAlign:"center"
       }}>
-        <div>Polling: {POLL_INTERVAL_MS / 1000}s | Eventos: {EVENTS_POLL_INTERVAL_MS / 1000}s | API: {import.meta.env.VITE_API_BASE || 'http://localhost:8001'}</div>
+        <div>Polling: 2s (máquinas) | 1s (status) | Eventos: {EVENTS_POLL_INTERVAL_MS / 1000}s | API: {import.meta.env.VITE_API_BASE || 'http://localhost:8001'}</div>
         <div style={{marginTop:8}}>CNC-Genius Telemetria v0.2 • Dashboard + Log de eventos • 1920×1080</div>
       </footer>
 
@@ -471,6 +529,15 @@ function AlarmCard({ alarmCode, alarmMessage }: { alarmCode?: string | null, ala
         </div>
       )}
     </div>
+  );
+}
+
+// Wrap AppContent with MachinesProvider
+export default function App() {
+  return (
+    <MachinesProvider>
+      <AppContent />
+    </MachinesProvider>
   );
 }
 

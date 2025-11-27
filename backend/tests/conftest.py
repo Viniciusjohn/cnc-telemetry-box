@@ -1,12 +1,18 @@
 import pytest
+import sys
+import os
+
+# Add parent directory to path to import from backend
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db import Base, get_db
-from app.routers import status as status_router
-from main import app as fastapi_app
+from backend.app.db import Base, get_db
+from backend.app.routers import status as status_router
+from backend.main import app as fastapi_app
 
 TEST_DATABASE_URL = "sqlite+pysqlite:///:memory:"
 engine = create_engine(
@@ -99,7 +105,8 @@ def clean_db():
         session.commit()
     finally:
         session.close()
-    status_router.LAST_STATUS.clear()
+    from backend.app.routers import status
+    status.LAST_STATUS.clear()
     yield
 
 

@@ -1,0 +1,39 @@
+{
+  "timestamp": "2025-11-27T14:19:30.031638",
+  "summary": {
+    "total": 3,
+    "passed": 0,
+    "failed": 3,
+    "success_rate": 0.0,
+    "duration": 2.1921231746673584
+  },
+  "results": [
+    {
+      "script": "test_multi_machine.py",
+      "description": "Multi-Machine Backend Functionality",
+      "success": false,
+      "duration": 1.750328779220581,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"C:\\cnc-telemetry-box\\test_multi_machine.py\", line 12, in <module>\n    from backend.main import app\n  File \"C:\\cnc-telemetry-box\\backend\\main.py\", line 18, in <module>\n    from backend.app.logging_config import get_logger, log_function_call\n  File \"C:\\cnc-telemetry-box\\backend\\app\\logging_config.py\", line 14, in <module>\n    import structlog\nModuleNotFoundError: No module named 'structlog'\n",
+      "returncode": 1
+    },
+    {
+      "script": "test_frontend_integration.py",
+      "description": "Frontend Components Integration",
+      "success": false,
+      "duration": 0.22856473922729492,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"C:\\cnc-telemetry-box\\test_frontend_integration.py\", line 361, in <module>\n    main()\n  File \"C:\\cnc-telemetry-box\\test_frontend_integration.py\", line 305, in main\n    print(\"\\U0001f3af CNC Telemetry Box - Integration Test Suite\")\n  File \"C:\\Users\\vinij\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\encodings\\cp1252.py\", line 19, in encode\n    return codecs.charmap_encode(input,self.errors,encoding_table)[0]\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nUnicodeEncodeError: 'charmap' codec can't encode character '\\U0001f3af' in position 0: character maps to <undefined>\n",
+      "returncode": 1
+    },
+    {
+      "script": "test_microservices.py",
+      "description": "Microservices Architecture",
+      "success": false,
+      "duration": 0.21322965621948242,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"C:\\cnc-telemetry-box\\test_microservices.py\", line 448, in <module>\n    main()\n  File \"C:\\cnc-telemetry-box\\test_microservices.py\", line 384, in main\n    print(\"\\U0001f3af CNC Telemetry Box - Microservices Test Suite\")\n  File \"C:\\Users\\vinij\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\encodings\\cp1252.py\", line 19, in encode\n    return codecs.charmap_encode(input,self.errors,encoding_table)[0]\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nUnicodeEncodeError: 'charmap' codec can't encode character '\\U0001f3af' in position 0: character maps to <undefined>\n",
+      "returncode": 1
+    }
+  ]
+}

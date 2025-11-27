@@ -3,6 +3,16 @@ uvicorn[standard]==0.24.0
 httpx==0.27.0
 pydantic==2.5.0  # ATENCAO: wheels oficiais ate Python 3.12; Py3.13+ exige Rust/Cargo para pydantic-core [ASSUNCAO]
 
+# System monitoring
+psutil==5.9.6
+
+# Structured logging
+structlog==23.2.0
+python-json-logger==2.0.7
+
+# Rate limiting
+slowapi==0.1.9
+
 # Database (F5 Histórico)
 psycopg2-binary==2.9.10  # bumped para evitar build local (pg_config) [ASSUNCAO]
 asyncpg==0.29.0
