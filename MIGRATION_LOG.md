@@ -76,3 +76,43 @@
 **Checklist**: ✅ 5/5 itens executados
 
 **Conclusão**: Workflow v2 validado para mudanças médias - tempo ≤ 15 min, commits separados, rollback funcional
+
+---
+
+## 2025-11-27 - Primeira Migração Real (Piloto Nestor)
+
+**Windows ref**: main (28a982c)  
+**Descrição**: Adicionar campo `machine_count_by_state` ao `/box/healthz` para piloto Nestor  
+**Contexto**: Primeira aplicação do workflow para necessidade real de negócio (não experimento técnico)
+
+**Arquivos alterados**:
+- `backend/app/routers/box_health.py` (+82 linhas)
+  - Função `get_machine_count_by_state()` com CTE SQL
+  - Detecção de dialeto SQLite/PostgreSQL
+  - Estados: running (≤5 min), idle (5-30 min), offline (>30 min)
+  - Schema corrigido: coluna 'ts' em vez de 'timestamp'
+
+**Testes executados**:
+- ✅ Healthz retorna `machine_count_by_state: {'running': 0, 'idle': 0, 'offline': 4}`
+- ✅ CTE SQL funciona em SQLite (teste local)
+- ✅ Rollback validado: campo removido/aparecido com `git checkout HEAD~1`
+- ✅ Nota: offline: 4 é esperado com dados de teste estagnados
+
+**Resultado**: SUCCESS  
+**Tempo total**: 10 minutos (vs meta ≤ 15 min)  
+**Tempo por etapa**:
+- Checklist: 1 min
+- Implementação: 6 min (incluindo debug schema/SQL)
+- Testes/Validação: 2 min
+- Commit/Rollback: 1 min
+
+**Fricções**: 
+- Schema da tabela telemetry usa 'ts' em vez de 'timestamp'
+- Query SQL original agrupava incorretamente (fixado com CTE)
+- Nenhuma dependência adicional necessária
+
+**Commits**: ✅ 1 commit separado (padrão migrate: from windows@hash)  
+**Rollback**: ✅ Funcionou perfeitamente  
+**Checklist**: ✅ 5/5 itens executados
+
+**Conclusão**: Workflow Windows→Box OFICIALMENTE VALIDADO para produção real - transição completa de experimentos para necessidades do piloto
