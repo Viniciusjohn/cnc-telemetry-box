@@ -140,6 +140,84 @@ def get_db_status() -> Dict[str, Any]:
             "error": str(e)
         }
 
+def get_machine_count_by_state() -> Dict[str, int]:
+    """Conta máquinas por estado baseado em heartbeat (running/idle/offline)"""
+    try:
+        dialect_name = engine.dialect.name
+        
+        with engine.connect() as conn:
+            if dialect_name == 'postgresql':
+                # PostgreSQL: usa CTE para obter MAX(ts) por machine_id, depois classifica
+                result = conn.execute(text("""
+                    WITH machine_last_seen AS (
+                        SELECT 
+                            machine_id,
+                            MAX(ts) as last_seen
+                        FROM telemetry 
+                        WHERE ts >= NOW() - INTERVAL '24 hours'
+                        GROUP BY machine_id
+                    )
+                    SELECT 
+                        CASE 
+                            WHEN NOW() - last_seen <= INTERVAL '5 minutes' THEN 'running'
+                            WHEN NOW() - last_seen <= INTERVAL '30 minutes' THEN 'idle'
+                            ELSE 'offline'
+                        END as state,
+                        COUNT(machine_id) as count
+                    FROM machine_last_seen
+                    GROUP BY state
+                """))
+                
+            elif dialect_name == 'sqlite':
+                # SQLite: usa subquery com julianday para minutos
+                result = conn.execute(text("""
+                    WITH machine_last_seen AS (
+                        SELECT 
+                            machine_id,
+                            MAX(ts) as last_seen
+                        FROM telemetry 
+                        WHERE ts >= datetime('now', '-24 hours')
+                        GROUP BY machine_id
+                    )
+                    SELECT 
+                        CASE 
+                            WHEN (julianday('now') - julianday(last_seen)) * 24 * 60 <= 5 THEN 'running'
+                            WHEN (julianday('now') - julianday(last_seen)) * 24 * 60 <= 30 THEN 'idle'
+                            ELSE 'offline'
+                        END as state,
+                        COUNT(machine_id) as count
+                    FROM machine_last_seen
+                    GROUP BY state
+                """))
+            else:
+                # Fallback genérico
+                result = conn.execute(text("""
+                    WITH machine_last_seen AS (
+                        SELECT 
+                            machine_id,
+                            MAX(ts) as last_seen
+                        FROM telemetry 
+                        WHERE ts >= CURRENT_TIMESTAMP - INTERVAL '24 hours'
+                        GROUP BY machine_id
+                    )
+                    SELECT 'offline' as state, COUNT(machine_id) as count
+                    FROM machine_last_seen
+                """))
+            
+            # Processar resultados
+            state_counts = {'running': 0, 'idle': 0, 'offline': 0}
+            for row in result:
+                state = row[0]
+                count = row[1]
+                if state in state_counts:
+                    state_counts[state] = count
+            
+            return state_counts
+            
+    except Exception as e:
+        print(f"Error getting machine count by state: {e}")
+        return {'running': 0, 'idle': 0, 'offline': 0, 'error': str(e)}
+
 def get_machine_count() -> Dict[str, int]:
     """Conta máquinas registradas no sistema"""
     try:
@@ -198,6 +276,9 @@ def get_box_health() -> Dict[str, Any]:
     # Contagem de máquinas
     machine_count = get_machine_count()
     
+    # Contagem de máquinas por estado (piloto Nestor)
+    machine_count_by_state = get_machine_count_by_state()
+    
     # Status geral
     all_running = all(status == "running" for status in services.values())
     overall_status = "healthy" if all_running else "degraded"
@@ -220,6 +301,7 @@ def get_box_health() -> Dict[str, Any]:
         "system": system,
         "db_status": db_status,
         "machine_count": machine_count,
+        "machine_count_by_state": machine_count_by_state,
         "alerts": alerts,
         "uptime_formatted": format_uptime(system["uptime_seconds"])
     }
