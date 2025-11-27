@@ -73,6 +73,106 @@ def get_system_metrics() -> Dict[str, float]:
             "uptime_seconds": time.time() - START_TIME
         }
 
+def get_db_status() -> Dict[str, Any]:
+    """Obtém status detalhado do banco de dados"""
+    try:
+        dialect_name = engine.dialect.name
+        
+        with engine.connect() as conn:
+            if dialect_name == 'postgresql':
+                # PostgreSQL específico
+                version_result = conn.execute(text("SELECT version()"))
+                db_version = version_result.scalar()
+                
+                tables_result = conn.execute(text("""
+                    SELECT count(*) FROM information_schema.tables 
+                    WHERE table_schema = 'public'
+                """))
+                table_count = tables_result.scalar()
+                
+                size_result = conn.execute(text("""
+                    SELECT pg_size_pretty(pg_database_size(current_database()))
+                """))
+                db_size = size_result.scalar()
+                
+                return {
+                    "status": "connected",
+                    "dialect": "postgresql",
+                    "version": db_version.split(',')[0],
+                    "table_count": table_count,
+                    "size": db_size
+                }
+            
+            elif dialect_name == 'sqlite':
+                # SQLite fallback
+                tables_result = conn.execute(text("""
+                    SELECT count(*) FROM sqlite_master 
+                    WHERE type='table' AND name NOT LIKE 'sqlite_%'
+                """))
+                table_count = tables_result.scalar()
+                
+                return {
+                    "status": "connected",
+                    "dialect": "sqlite",
+                    "version": "SQLite",
+                    "table_count": table_count,
+                    "size": "N/A"
+                }
+            
+            else:
+                # Outros bancos
+                return {
+                    "status": "connected",
+                    "dialect": dialect_name,
+                    "version": "Unknown",
+                    "table_count": 0,
+                    "size": "N/A"
+                }
+                
+    except Exception as e:
+        print(f"Error getting DB status: {e}")
+        return {
+            "status": "error",
+            "dialect": engine.dialect.name if 'engine' in locals() else "unknown",
+            "version": None,
+            "table_count": 0,
+            "size": None,
+            "error": str(e)
+        }
+
+def get_machine_count() -> Dict[str, int]:
+    """Conta máquinas registradas no sistema"""
+    try:
+        with engine.connect() as conn:
+            # Contar máquinas distintas na tabela de telemetria
+            telemetry_result = conn.execute(text("""
+                SELECT count(DISTINCT machine_id) FROM telemetry
+            """))
+            telemetry_count = telemetry_result.scalar() or 0
+            
+            # Contar máquinas na tabela de status (se existir)
+            try:
+                status_result = conn.execute(text("""
+                    SELECT count(DISTINCT machine_id) FROM machine_status
+                """))
+                status_count = status_result.scalar() or 0
+            except:
+                status_count = 0
+            
+            return {
+                "total_machines": max(telemetry_count, status_count),
+                "telemetry_machines": telemetry_count,
+                "status_machines": status_count
+            }
+    except Exception as e:
+        print(f"Error getting machine count: {e}")
+        return {
+            "total_machines": 0,
+            "telemetry_machines": 0,
+            "status_machines": 0,
+            "error": str(e)
+        }
+
 @router.get("/healthz")
 def get_box_health() -> Dict[str, Any]:
     """
@@ -91,6 +191,12 @@ def get_box_health() -> Dict[str, Any]:
     
     # Métricas do sistema
     system = get_system_metrics()
+    
+    # Status detalhado do banco
+    db_status = get_db_status()
+    
+    # Contagem de máquinas
+    machine_count = get_machine_count()
     
     # Status geral
     all_running = all(status == "running" for status in services.values())
@@ -112,6 +218,8 @@ def get_box_health() -> Dict[str, Any]:
         "timestamp": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
         "services": services,
         "system": system,
+        "db_status": db_status,
+        "machine_count": machine_count,
         "alerts": alerts,
         "uptime_formatted": format_uptime(system["uptime_seconds"])
     }
