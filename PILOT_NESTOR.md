@@ -46,20 +46,28 @@ Para cada máquina CNC:
 # Arquivo: .env ou config/machines.yaml
 TELEMETRY_MACHINES="M80-001:192.168.1.100:7878,M80-002:192.168.1.101:7878"
 
-# Ou via API (após Box estar online)
-curl -X POST http://IP_DO_BOX:8001/machines \
-  -H "Content-Type: application/json" \
-  -d '{"machine_id": "M80-001", "endpoint": "http://192.168.1.100:7878"}'
+# Nota: API POST /machines será implementada em v2
+# Por enquanto, configure via .env e restart do container
 ```
 
 ### **Validando conexão**
 ```bash
 # Verificar se máquina aparece no healthz
-curl http://IP_DO_BOX:box/healthz | jq '.machine_count_by_state'
+curl http://IP_DO_BOX:8001/box/healthz | jq '.machine_count_by_state'
 
-# Verificar dados de telemetria
-curl http://IP_DO_BOX:8001/telemetry/M80-001
+# Verificar status da máquina (endpoint real)
+curl http://IP_DO_BOX:8001/status/M80-001/status
+
+# Verificar eventos da máquina (endpoint real)
+curl http://IP_DO_BOX:8001/status/M80-001/events
 ```
+
+### **Endpoints API disponíveis (baseline)**
+- `GET /box/healthz` - Health check completo
+- `GET /status/{machine_id}/status` - Status atual da máquina
+- `GET /status/{machine_id}/events` - Eventos recentes da máquina
+- `GET /oee/{machine_id}` - Métricas OEE (se disponível)
+- `GET /history/{machine_id}` - Histórico de telemetria
 
 ---
 
