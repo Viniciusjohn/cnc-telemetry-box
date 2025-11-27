@@ -3,6 +3,7 @@ import { fetchMachineEvents, MachineEvent, ApiError } from "./lib/api";
 import { OEECard } from "./components/OEECard";
 import { MachineSelector } from "./components/MachineSelector";
 import { BoxHealth } from "./components/BoxHealth";
+import { MachineStateCard } from "./components/MachineStateCard";
 import { ErrorBoundary, NetworkErrorFallback, DataErrorFallback } from "./components/ErrorBoundary";
 import { useMachines } from "./contexts/MachinesContext";
 import { MachinesProvider } from "./contexts/MachinesContext";
@@ -216,6 +217,13 @@ function AppContent() {
           Carregando status da máquina...
         </div>
       )}
+
+      {/* Machine State Card - Visão geral para o piloto Nestor */}
+      <section style={{marginBottom:32}}>
+        <ErrorBoundary fallback={<DataErrorFallback />}>
+          <MachineStateCard />
+        </ErrorBoundary>
+      </section>
 
       {/* Top Row - 3 Large Cards */}
       <section style={{
