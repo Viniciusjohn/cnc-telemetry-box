@@ -1,6 +1,6 @@
 """
-Logging estruturado para CNC Telemetry Box.
-Configura logging com formato JSON, níveis apropriados e context.
+Logging estruturado para CNC Telemetry Windows.
+Configura logging com formato JSON, níveis apropriados e context para ambiente de fábrica.
 """
 
 import logging
@@ -10,13 +10,23 @@ from datetime import datetime
 from typing import Any, Dict
 import json
 import os
+import platform
 
 import structlog
 from pythonjsonlogger import jsonlogger
 
 # Configuração base
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-LOG_FORMAT = os.getenv("LOG_FORMAT", "json")  # json ou console
+LOG_FORMAT = os.getenv("LOG_FORMAT", "console")  # json ou console
+
+# Adaptar paths para Windows
+IS_WINDOWS = platform.system() == "Windows"
+if IS_WINDOWS:
+    LOG_DIR = os.path.join(os.getenv("PROGRAMDATA", "C:\\ProgramData"), "CNC-Telemetry", "logs")
+    LOG_FILE = os.path.join(LOG_DIR, "telemetry.log")
+else:
+    LOG_DIR = "/var/log/cnc-telemetry"
+    LOG_FILE = "/var/log/cnc-telemetry/app.log"
 
 
 class JSONFormatter(jsonlogger.JsonFormatter):
@@ -29,7 +39,8 @@ class JSONFormatter(jsonlogger.JsonFormatter):
         log_record["timestamp"] = datetime.utcnow().isoformat() + "Z"
         log_record["service"] = "cnc-telemetry"
         log_record["version"] = os.getenv("APP_VERSION", "v1.0.0")
-        log_record["environment"] = os.getenv("ENVIRONMENT", "development")
+        log_record["environment"] = os.getenv("ENVIRONMENT", "production")
+        log_record["platform"] = platform.system()
         
         # Adicionar context se disponível
         if not log_record.get("logger"):
@@ -41,7 +52,7 @@ class JSONFormatter(jsonlogger.JsonFormatter):
 
 
 def setup_logging():
-    """Configura logging estruturado para toda aplicação."""
+    """Configura logging estruturado para toda aplicação Windows."""
     
     # Configuração structlog
     structlog.configure(
@@ -61,6 +72,9 @@ def setup_logging():
         wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=True,
     )
+    
+    # Criar diretório de logs se não existir
+    os.makedirs(LOG_DIR, exist_ok=True)
     
     # Configuração logging padrão
     logging_config = {
@@ -86,37 +100,35 @@ def setup_logging():
                 "class": "logging.handlers.RotatingFileHandler",
                 "level": LOG_LEVEL,
                 "formatter": "json",
-                "filename": "/var/log/cnc-telemetry/app.log",
-                "maxBytes": 10485760,  # 10MB
-                "backupCount": 5
+                "filename": LOG_FILE,
+                "maxBytes": 5242880,  # 5MB (menor para Windows)
+                "backupCount": 3,     # Manter 4 arquivos no total (20MB)
+                "encoding": "utf-8"
             }
         },
         "loggers": {
             "": {  # Root logger
                 "level": LOG_LEVEL,
-                "handlers": ["console", "file"] if os.path.exists("/var/log/cnc-telemetry") else ["console"],
+                "handlers": ["console", "file"],
                 "propagate": False
             },
             "cnc-telemetry": {
                 "level": LOG_LEVEL,
-                "handlers": ["console", "file"] if os.path.exists("/var/log/cnc-telemetry") else ["console"],
+                "handlers": ["console", "file"],
                 "propagate": False
             },
             "uvicorn": {
                 "level": "INFO",
-                "handlers": ["console"],
+                "handlers": ["console", "file"],
                 "propagate": False
             },
             "sqlalchemy.engine": {
                 "level": "WARNING",
-                "handlers": ["console"],
+                "handlers": ["console", "file"],
                 "propagate": False
             }
         }
     }
-    
-    # Criar diretório de logs se não existir
-    os.makedirs("/var/log/cnc-telemetry", exist_ok=True)
     
     # Aplicar configuração
     logging.config.dictConfig(logging_config)
@@ -166,3 +178,16 @@ def log_function_call(func):
             raise
     
     return wrapper
+
+
+def get_log_info() -> Dict[str, Any]:
+    """Retorna informações sobre configuração de logs para diagnóstico."""
+    return {
+        "log_directory": LOG_DIR,
+        "log_file": LOG_FILE,
+        "log_level": LOG_LEVEL,
+        "log_format": LOG_FORMAT,
+        "platform": platform.system(),
+        "log_file_exists": os.path.exists(LOG_FILE),
+        "log_file_size_mb": round(os.path.getsize(LOG_FILE) / (1024*1024), 2) if os.path.exists(LOG_FILE) else 0
+    }
