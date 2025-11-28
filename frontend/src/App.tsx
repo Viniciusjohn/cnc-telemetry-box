@@ -384,10 +384,6 @@ function AppContent() {
         </ErrorBoundary>
       </section>
 
-        </>
-        )}
-      </ErrorBoundary>
-
       {/* Footer */}
       <footer style={{
         marginTop:40, 
