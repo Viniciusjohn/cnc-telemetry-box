@@ -158,6 +158,25 @@ try {
 & $NssmPath set $serviceName Start SERVICE_AUTO_START
 & $NssmPath set $serviceName AppEnvironmentExtra "PYTHONPATH=$backendDir"
 
+# Configurar políticas de restart automático
+Write-Host "Configurando políticas de restart..."
+& $NssmPath set $serviceName AppRestartDelay 30000
+& $NssmPath set $serviceName AppThrottle 5000
+& $NssmPath set $serviceName AppExit Default Restart
+& $NssmPath set $serviceName AppRestartDelay 15000
+
+# Configurar firewall Windows para permitir portas
+Write-Host "Configurando firewall Windows..."
+try {
+    # Permitir porta API (8001)
+    New-NetFirewallRule -DisplayName "CNC Telemetry API" -Direction Inbound -Protocol TCP -LocalPort $ApiPort -Action Allow -ErrorAction SilentlyContinue
+    # Permitir porta Frontend (3000)
+    New-NetFirewallRule -DisplayName "CNC Telemetry Frontend" -Direction Inbound -Protocol TCP -LocalPort 3000 -Action Allow -ErrorAction SilentlyContinue
+    Write-Host "Regras de firewall criadas com sucesso."
+} catch {
+    Write-Warning "Falha ao configurar firewall (pode requerer administrador): $_"
+}
+
 Write-Host "Iniciando serviço..."
 & $NssmPath start $serviceName
 
