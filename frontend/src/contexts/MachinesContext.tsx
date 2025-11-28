@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { fetchMachines, fetchMachineStatus, MachineStatus, ApiError } from "../lib/api";
 
 interface MachinesContextType {
