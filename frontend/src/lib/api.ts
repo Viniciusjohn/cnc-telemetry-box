@@ -90,14 +90,3 @@ export async function fetchMachines(): Promise<string[]> {
 
   return response.json();
 }
-
-export async function fetchMachinesStatusGrid(): Promise<MachineGridItem[]> {
-  const url = `${API_BASE}/v1/machines/status?view=grid`;
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new ApiError(response.status, `Failed to fetch machines status grid: ${response.statusText}`);
-  }
-
-  return response.json();
-}

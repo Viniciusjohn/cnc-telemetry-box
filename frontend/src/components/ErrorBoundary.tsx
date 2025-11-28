@@ -106,10 +106,10 @@ export class ErrorBoundary extends Component<Props, State> {
               <p><strong>ID do Erro:</strong> {this.state.errorId}</p>
               <p><strong>Mensagem:</strong> {this.state.error?.message}</p>
               
-              {process.env.NODE_ENV === 'development' && this.state.errorInfo && (
+              {import.meta.env.DEV && this.state.errorInfo && (
                 <details className="error-stack">
                   <summary>Stack Trace (Development)</summary>
-                  <pre>{this.state.error.stack}</pre>
+                  <pre>{this.state.error?.stack || 'No stack available'}</pre>
                   <pre>{this.state.errorInfo.componentStack}</pre>
                 </details>
               )}

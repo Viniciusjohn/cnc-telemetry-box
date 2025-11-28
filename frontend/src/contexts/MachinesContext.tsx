@@ -1,10 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { fetchMachines, fetchMachinesStatusGrid, MachineGridItem, MachineStatus, fetchMachineStatus, ApiError } from "../lib/api";
+import { fetchMachines, fetchMachineStatus, MachineStatus, ApiError } from "../lib/api";
 
 interface MachinesContextType {
   // Machines list and grid data
   machines: string[];
-  machinesGrid: MachineGridItem[];
   machinesLoading: boolean;
   machinesError: string | null;
   
@@ -27,81 +26,61 @@ interface MachinesProviderProps {
 }
 
 export function MachinesProvider({ children }: MachinesProviderProps) {
-  // Machines list and grid state
   const [machines, setMachines] = useState<string[]>([]);
-  const [machinesGrid, setMachinesGrid] = useState<MachineGridItem[]>([]);
-  const [machinesLoading, setMachinesLoading] = useState(true);
+  const [machinesLoading, setMachinesLoading] = useState(false);
   const [machinesError, setMachinesError] = useState<string | null>(null);
   
-  // Selected machine state
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
   const [selectedMachineStatus, setSelectedMachineStatus] = useState<MachineStatus | null>(null);
   const [selectedMachineLoading, setSelectedMachineLoading] = useState(false);
   const [selectedMachineError, setSelectedMachineError] = useState<string | null>(null);
 
-  // Poll machines list and grid every 2 seconds
+  // Fetch machines list
   useEffect(() => {
     let isMounted = true;
     
-    async function pollMachines() {
+    async function fetchMachinesList() {
       try {
-        // Fetch both machines list and grid in parallel
-        const [machinesList, gridData] = await Promise.all([
-          fetchMachines(),
-          fetchMachinesStatusGrid()
-        ]);
-        
+        setMachinesLoading(true);
+        setMachinesError(null);
+        const machinesList = await fetchMachines();
         if (isMounted) {
           setMachines(machinesList);
-          setMachinesGrid(gridData);
-          setMachinesError(null);
-          setMachinesLoading(false);
-          
-          // Auto-select first machine if none selected
-          if (!selectedMachineId && machinesList.length > 0) {
-            setSelectedMachineId(machinesList[0]);
-          }
         }
-      } catch (e) {
+      } catch (error) {
         if (isMounted) {
-          if (e instanceof ApiError) {
-            setMachinesError(`HTTP ${e.status}: ${e.message}`);
-          } else {
-            setMachinesError(e instanceof Error ? e.message : "Unknown error");
-          }
+          setMachinesError(error instanceof Error ? error.message : "Failed to fetch machines");
+          setMachines([]);
+        }
+      } finally {
+        if (isMounted) {
           setMachinesLoading(false);
         }
       }
     }
 
-    // Initial fetch
-    pollMachines();
-    
-    // Set up polling
-    const interval = setInterval(pollMachines, 2000);
+    fetchMachinesList();
     
     return () => {
       isMounted = false;
-      clearInterval(interval);
     };
-  }, [selectedMachineId]);
+  }, []);
 
-  // Fetch selected machine status when selection changes
+  // Fetch selected machine status
   useEffect(() => {
     if (!selectedMachineId) {
       setSelectedMachineStatus(null);
       setSelectedMachineError(null);
-      setSelectedMachineLoading(false);
       return;
     }
 
     let isMounted = true;
-    setSelectedMachineLoading(true);
-    setSelectedMachineError(null);
-
-    async function fetchSelectedStatus() {
+    
+    async function fetchStatus() {
       try {
-        const status = await fetchMachineStatus(selectedMachineId);
+        setSelectedMachineLoading(true);
+        setSelectedMachineError(null);
+        const status = await fetchMachineStatus(selectedMachineId ?? undefined);
         if (isMounted) {
           setSelectedMachineStatus(status);
           setSelectedMachineError(null);
@@ -120,10 +99,10 @@ export function MachinesProvider({ children }: MachinesProviderProps) {
       }
     }
 
-    fetchSelectedStatus();
+    fetchStatus();
     
     // Poll selected machine status every second
-    const interval = setInterval(fetchSelectedStatus, 1000);
+    const interval = setInterval(fetchStatus, 1000);
     
     return () => {
       isMounted = false;
@@ -138,12 +117,8 @@ export function MachinesProvider({ children }: MachinesProviderProps) {
   const refreshMachines = async () => {
     setMachinesLoading(true);
     try {
-      const [machinesList, gridData] = await Promise.all([
-        fetchMachines(),
-        fetchMachinesStatusGrid()
-      ]);
+      const machinesList = await fetchMachines();
       setMachines(machinesList);
-      setMachinesGrid(gridData);
       setMachinesError(null);
     } catch (e) {
       if (e instanceof ApiError) {
@@ -161,7 +136,7 @@ export function MachinesProvider({ children }: MachinesProviderProps) {
     
     setSelectedMachineLoading(true);
     try {
-      const status = await fetchMachineStatus(selectedMachineId);
+      const status = await fetchMachineStatus(selectedMachineId ?? undefined);
       setSelectedMachineStatus(status);
       setSelectedMachineError(null);
     } catch (e) {
@@ -176,9 +151,8 @@ export function MachinesProvider({ children }: MachinesProviderProps) {
   };
 
   const value: MachinesContextType = {
-    // Machines list and grid
+    // Machines list
     machines,
-    machinesGrid,
     machinesLoading,
     machinesError,
     
